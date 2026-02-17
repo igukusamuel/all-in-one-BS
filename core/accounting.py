@@ -1,28 +1,42 @@
 import streamlit as st
 
+
 def post_sale(subtotal, discount, tax, total):
-    """
-    Posts a retail sale into the accounting engine.
-    Assumes cash sale for now.
-    """
+
+    if "ledger" not in st.session_state:
+        st.session_state.ledger = []
 
     journal_entry = {
-        "debits": [
-            {"account": "Cash", "amount": total},
-            {"account": "Discount Expense", "amount": discount} if discount > 0 else None,
-        ],
-        "credits": [
-            {"account": "Revenue", "amount": subtotal},
-            {"account": "Tax Payable", "amount": tax} if tax > 0 else None,
-        ],
+        "debits": [],
+        "credits": []
     }
 
-    # Remove None entries
-    journal_entry["debits"] = [d for d in journal_entry["debits"] if d]
-    journal_entry["credits"] = [c for c in journal_entry["credits"] if c]
+    # Debit Cash
+    journal_entry["debits"].append({
+        "account": "Cash",
+        "amount": total
+    })
 
-    # For now just print — later store in DB
-    print("Journal Entry Posted:")
-    print(journal_entry)
+    # Debit Discount (if any)
+    if discount > 0:
+        journal_entry["debits"].append({
+            "account": "Discount Expense",
+            "amount": discount
+        })
+
+    # Credit Revenue
+    journal_entry["credits"].append({
+        "account": "Revenue",
+        "amount": subtotal
+    })
+
+    # Credit Tax
+    if tax > 0:
+        journal_entry["credits"].append({
+            "account": "Tax Payable",
+            "amount": tax
+        })
+
+    st.session_state.ledger.append(journal_entry)
 
     return journal_entry
