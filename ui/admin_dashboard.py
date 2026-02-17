@@ -17,15 +17,17 @@ def admin_dashboard():
     if menu == "Dashboard Home":
         st.subheader("Overview")
         st.info("Summary of sales, inventory, and orders will appear here.")
-        # Optionally add KPIs, charts, totals
 
     elif menu == "PO & Sales Ledger":
         st.subheader("Purchase Orders & Sales Ledger")
-        ledger = get_ledger()  # returns all POs + sales
+        ledger = get_ledger()
+        if not ledger:
+            st.info("No sales recorded yet.")
         for idx, entry in enumerate(ledger):
             st.markdown(f"### Entry {idx+1}")
-            st.write("Debits:", entry.get("debits", []))
-            st.write("Credits:", entry.get("credits", []))
+            st.write("Type:", entry.get("type"))
+            st.write("Total:", entry.get("total"))
+            st.write("Payment Method:", entry.get("payment_method"))
             st.divider()
 
     elif menu == "Ordering / Auto-Reorder":
@@ -35,7 +37,11 @@ def admin_dashboard():
     elif menu == "Staff Management":
         st.subheader("Staff Onboarding & Roles")
         staff_list = get_staff()
-        st.write(staff_list)
+        if staff_list:
+            for s in staff_list:
+                st.write(f"{s['name']} → Role: {s['role']}")
+        else:
+            st.info("No staff added yet.")
 
         with st.form("add_staff"):
             name = st.text_input("Staff Name")
@@ -48,7 +54,6 @@ def admin_dashboard():
 
     elif menu == "Store Settings":
         st.subheader("Configure Store Settings")
-        # Example: VAT, minimum stock, payment options
         vat = st.number_input("VAT %", 0.0, 100.0, 12.0)
         min_stock = st.number_input("Default Minimum Stock", 0, 100, 10)
         st.write(f"VAT set to {vat}% and default minimum stock set to {min_stock}")
