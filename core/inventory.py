@@ -19,3 +19,16 @@ def get_inventory():
 def reduce_inventory(name, quantity):
     # Replace with DB logic later
     pass
+
+def check_auto_reorder(product_name, sold_qty):
+    """
+    Checks if stock is below minimum threshold and triggers reorder.
+    For MVP, just print a message.
+    """
+    inventory = get_inventory()
+    product = next((i for i in inventory if i["name"] == product_name), None)
+    if not product:
+        return
+    product["stock"] -= sold_qty
+    if product["stock"] <= product.get("min_stock", 10):
+        print(f"Auto-reorder triggered for {product_name}, stock={product['stock']}")
