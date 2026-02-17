@@ -1,1 +1,5 @@
+[
+  {"name": "Coffee Supplier A", "products": ["Espresso", "Latte", "Cappuccino", "Americano", "Mocha"]},
+  {"name": "Bakery Supplier B", "products": ["Chocolate Muffin", "Croissant", "Blueberry Muffin", "Bagel", "Donut"]}
+]
 
