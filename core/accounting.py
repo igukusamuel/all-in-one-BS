@@ -1,18 +1,28 @@
-import streamlit as st
+import json
+from datetime import datetime
 
-def post_sale(subtotal, discount, tax, total, payment_method):
-    if "ledger" not in st.session_state:
-        st.session_state.ledger = []
-    st.session_state.ledger.append({
-        "type": "sale",
-        "subtotal": subtotal,
-        "discount": discount,
-        "tax": tax,
-        "total": total,
+LEDGER_PATH = "data/ledger.json"
+
+def load_ledger():
+    try:
+        with open(LEDGER_PATH, "r") as f:
+            return json.load(f)
+    except:
+        return []
+
+def save_ledger(entries):
+    with open(LEDGER_PATH, "w") as f:
+        json.dump(entries, f, indent=4)
+
+def post_sale(total, payment_method):
+    ledger = load_ledger()
+
+    entry = {
+        "date": str(datetime.now()),
+        "type": "SALE",
+        "amount": total,
         "payment_method": payment_method
-    })
+    }
 
-def get_ledger():
-    if "ledger" not in st.session_state:
-        st.session_state.ledger = []
-    return st.session_state.ledger
+    ledger.append(entry)
+    save_ledger(ledger)
