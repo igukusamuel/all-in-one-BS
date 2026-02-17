@@ -92,7 +92,7 @@ def pos_screen():
                         )
 
                         # Add to cart button
-                        if st.button(f"➕ Add", key=f"add_{item['name']}"):
+                        if st.button(f"➕", key=f"add_{item['name']}"):
                             if item["name"] in st.session_state.cart:
                                 st.session_state.cart[item["name"]]["qty"] += 1
                             else:
@@ -111,15 +111,15 @@ def pos_screen():
             with col_qty:
                 st.write(f"Qty: {data['qty']}")
             with col_inc:
-                if st.button("➕ Add", key=f"inc_{name}"):
+                if st.button("➕", key=f"inc_{name}"):
                     st.session_state.cart[name]["qty"] += 1
             with col_dec:
-                if st.button("➖ Remove", key=f"dec_{name}"):
+                if st.button("➖", key=f"dec_{name}"):
                     st.session_state.cart[name]["qty"] -= 1
                     if st.session_state.cart[name]["qty"] <= 0:
                         del st.session_state.cart[name]
             with col_remove:
-                if st.button("🗑️ Delete", key=f"rm_{name}"):
+                if st.button("🗑️", key=f"rm_{name}"):
                     del st.session_state.cart[name]
 
             subtotal += data["price"] * data["qty"]
