@@ -1,1 +1,14 @@
+[
+  {"name": "Espresso", "category": "Beverages", "price": 3.0, "stock": 50, "min_stock": 10, "reorder_qty": 50, "image": "data/images/espresso.jpg", "barcode": "1111"},
+  {"name": "Latte", "category": "Beverages", "price": 4.0, "stock": 50, "min_stock": 10, "reorder_qty": 50, "image": "data/images/latte.jpg", "barcode": "1112"},
+  {"name": "Cappuccino", "category": "Beverages", "price": 4.5, "stock": 50, "min_stock": 10, "reorder_qty": 50, "image": "data/images/cappuccino.jpg", "barcode": "1113"},
+  {"name": "Americano", "category": "Beverages", "price": 3.5, "stock": 50, "min_stock": 10, "reorder_qty": 50, "image": "data/images/americano.jpg", "barcode": "1114"},
+  {"name": "Mocha", "category": "Beverages", "price": 5.0, "stock": 50, "min_stock": 10, "reorder_qty": 50, "image": "data/images/mocha.jpg", "barcode": "1115"},
+  
+  {"name": "Chocolate Muffin", "category": "Snacks", "price": 2.5, "stock": 30, "min_stock": 5, "reorder_qty": 20, "image": "data/images/muffin.jpg", "barcode": "2111"},
+  {"name": "Croissant", "category": "Snacks", "price": 2.0, "stock": 30, "min_stock": 5, "reorder_qty": 20, "image": "data/images/croissant.jpg", "barcode": "2112"},
+  {"name": "Blueberry Muffin", "category": "Snacks", "price": 2.5, "stock": 30, "min_stock": 5, "reorder_qty": 20, "image": "data/images/blueberry_muffin.jpg", "barcode": "2113"},
+  {"name": "Bagel", "category": "Snacks", "price": 1.5, "stock": 30, "min_stock": 5, "reorder_qty": 20, "image": "data/images/bagel.jpg", "barcode": "2114"},
+  {"name": "Donut", "category": "Snacks", "price": 1.0, "stock": 30, "min_stock": 5, "reorder_qty": 20, "image": "data/images/donut.jpg", "barcode": "2115"}
+]
 
