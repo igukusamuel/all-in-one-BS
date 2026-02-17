@@ -18,6 +18,8 @@ def pos_screen():
         st.session_state.view_mode = "pos"
     if "auto_po_triggered" not in st.session_state:
         st.session_state.auto_po_triggered = False
+    if "barcode_input" not in st.session_state:
+        st.session_state.barcode_input = ""
 
     inventory = get_inventory()
 
@@ -28,7 +30,7 @@ def pos_screen():
     if low_stock_items and not st.session_state.auto_po_triggered:
         st.session_state.view_mode = "purchase_order"
         st.session_state.auto_po_triggered = True
-        st.experimental_rerun()
+        return  # Render PO screen next
 
     # -----------------------------
     # Show PO screen if triggered
@@ -69,27 +71,28 @@ def pos_screen():
                 if idx < len(filtered):
                     item = filtered[idx]
                     available_stock = item["stock"] - st.session_state.cart.get(item["name"], {}).get("qty", 0)
-                    stock_warning = ""
-                    if available_stock <= CRITICAL_THRESHOLD:
-                        stock_warning = f" ⚠ Low Stock ({available_stock})"
 
                     with cols[c]:
+                        # Product Image
                         if item.get("image"):
                             try:
                                 img = Image.open(item["image"])
                                 st.image(img, width=100)
                             except:
                                 st.write("No image")
+                        # Product Info
+                        stock_warning = f" ⚠ Low Stock ({available_stock})" if available_stock <= CRITICAL_THRESHOLD else ""
                         st.markdown(
                             f"<div style='border:1px solid #ddd; padding:5px; border-radius:5px;'>"
-                            f"<h4>{item['name']}</h4>"
+                            f"<h4>{item['name']}{stock_warning}</h4>"
                             f"<p>Price: ${item['price']}</p>"
                             f"<p>Stock: {available_stock}</p>"
                             f"</div>",
                             unsafe_allow_html=True
                         )
-                        # Add to cart
-                        if st.button(f"Add {item['name']}", key=item['name']):
+
+                        # Add to cart button
+                        if st.button(f"Add {item['name']}", key=f"add_{item['name']}"):
                             if item["name"] in st.session_state.cart:
                                 st.session_state.cart[item["name"]]["qty"] += 1
                             else:
@@ -110,17 +113,14 @@ def pos_screen():
             with col_inc:
                 if st.button("+", key=f"inc_{name}"):
                     st.session_state.cart[name]["qty"] += 1
-                    st.experimental_rerun()
             with col_dec:
                 if st.button("-", key=f"dec_{name}"):
                     st.session_state.cart[name]["qty"] -= 1
                     if st.session_state.cart[name]["qty"] <= 0:
                         del st.session_state.cart[name]
-                    st.experimental_rerun()
             with col_remove:
                 if st.button("❌", key=f"rm_{name}"):
                     del st.session_state.cart[name]
-                    st.experimental_rerun()
 
             subtotal += data["price"] * data["qty"]
 
@@ -184,17 +184,15 @@ def pos_screen():
 
             st.session_state.cart = {}
             st.success("Sale Completed")
-            st.experimental_rerun()
 
         st.divider()
         if st.button("Close Shift", use_container_width=True):
             st.session_state.view_mode = "close_shift"
-            st.experimental_rerun()
 
     # -----------------------------
     # Barcode Scanner
     # -----------------------------
-    barcode_input = st.text_input("Scan Barcode")
+    barcode_input = st.text_input("Scan Barcode", value=st.session_state.barcode_input)
     if barcode_input:
         product = next((i for i in inventory if i.get("barcode") == barcode_input), None)
         if product:
@@ -202,4 +200,5 @@ def pos_screen():
                 st.session_state.cart[product["name"]]["qty"] += 1
             else:
                 st.session_state.cart[product["name"]] = {"price": product["price"], "qty": 1}
-            st.experimental_rerun()
+        # Clear barcode input after adding
+        st.session_state.barcode_input = ""
