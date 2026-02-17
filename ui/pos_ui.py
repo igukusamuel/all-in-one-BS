@@ -1,10 +1,11 @@
 import streamlit as st
+from PIL import Image
 from core.inventory import get_inventory, reduce_inventory, check_auto_reorder
 from core.accounting import post_sale
+from ui.purchase_order_ui import purchase_order_screen
 
 CRITICAL_THRESHOLD = 15
 TAX_RATE_DEFAULT = 0.12  # 12% VAT default
-
 
 def pos_screen():
 
@@ -13,38 +14,46 @@ def pos_screen():
     # -----------------------------
     if "cart" not in st.session_state:
         st.session_state.cart = {}
-
     if "view_mode" not in st.session_state:
         st.session_state.view_mode = "pos"
-
-    # -----------------------------
-    # ROUTING
-    # -----------------------------
-    if st.session_state.view_mode != "pos":
-        from ui.close_shift_ui import close_shift_screen
-        close_shift_screen()
-        return
-
-    st.title("Point of Sale")
+    if "auto_po_triggered" not in st.session_state:
+        st.session_state.auto_po_triggered = False
 
     inventory = get_inventory()
 
     # -----------------------------
-    # CATEGORY SELECTION
+    # Auto-Reorder Trigger
     # -----------------------------
+    low_stock_items = [i for i in inventory if i["stock"] <= i.get("min_stock", 10)]
+    if low_stock_items and not st.session_state.auto_po_triggered:
+        st.session_state.view_mode = "purchase_order"
+        st.session_state.auto_po_triggered = True
+        st.experimental_rerun()
+
+    # -----------------------------
+    # Show PO screen if triggered
+    # -----------------------------
+    if st.session_state.view_mode == "purchase_order":
+        purchase_order_screen()
+        return
+
+    # -----------------------------
+    # POS UI
+    # -----------------------------
+    st.title("Point of Sale")
+
     col_cat, col_products, col_cart = st.columns([1, 3, 1.5])
 
+    # -----------------------------
+    # CATEGORY SELECTION
+    # -----------------------------
     with col_cat:
         st.subheader("Categories")
         categories = sorted(set(item["category"] for item in inventory))
-        selected_category = st.radio(
-            "Select Category",
-            categories,
-            label_visibility="collapsed"
-        )
+        selected_category = st.radio("Select Category", categories, label_visibility="collapsed")
 
     # -----------------------------
-    # PRODUCT GRID
+    # PRODUCT GRID (3x4) with images
     # -----------------------------
     with col_products:
         st.subheader(selected_category)
@@ -65,49 +74,53 @@ def pos_screen():
                         stock_warning = f" ⚠ Low Stock ({available_stock})"
 
                     with cols[c]:
+                        if item.get("image"):
+                            try:
+                                img = Image.open(item["image"])
+                                st.image(img, width=100)
+                            except:
+                                st.write("No image")
                         st.markdown(
-                            f"""
-                            <div style='border:1px solid #ddd; padding:10px; border-radius:5px;'>
-                                <h4>{item['name']}</h4>
-                                <p>Price: ${item['price']}</p>
-                                <p>Stock: {available_stock}</p>
-                            </div>
-                            """,
+                            f"<div style='border:1px solid #ddd; padding:5px; border-radius:5px;'>"
+                            f"<h4>{item['name']}</h4>"
+                            f"<p>Price: ${item['price']}</p>"
+                            f"<p>Stock: {available_stock}</p>"
+                            f"</div>",
                             unsafe_allow_html=True
                         )
+                        # Add to cart
                         if st.button(f"Add {item['name']}", key=item['name']):
                             if item["name"] in st.session_state.cart:
                                 st.session_state.cart[item["name"]]["qty"] += 1
                             else:
-                                st.session_state.cart[item["name"]] = {
-                                    "price": item["price"],
-                                    "qty": 1
-                                }
+                                st.session_state.cart[item["name"]] = {"price": item["price"], "qty": 1}
 
     # -----------------------------
-    # CART PANEL
+    # CART PANEL with + / - buttons
     # -----------------------------
     with col_cart:
         st.subheader("Cart")
         subtotal = 0
 
-        # Show cart items
         for name, data in list(st.session_state.cart.items()):
-            col_a, col_b, col_c = st.columns([2, 1, 1])
-            with col_a:
-                st.write(name)
-            with col_b:
-                qty = st.number_input(
-                    "Qty",
-                    min_value=1,
-                    value=data["qty"],
-                    key=f"qty_{name}"
-                )
-                st.session_state.cart[name]["qty"] = qty
-            with col_c:
-                if st.button("❌", key=f"remove_{name}"):
+            st.write(name)
+            col_qty, col_inc, col_dec, col_remove = st.columns([2, 1, 1, 1])
+            with col_qty:
+                st.write(f"Qty: {data['qty']}")
+            with col_inc:
+                if st.button("+", key=f"inc_{name}"):
+                    st.session_state.cart[name]["qty"] += 1
+                    st.experimental_rerun()
+            with col_dec:
+                if st.button("-", key=f"dec_{name}"):
+                    st.session_state.cart[name]["qty"] -= 1
+                    if st.session_state.cart[name]["qty"] <= 0:
+                        del st.session_state.cart[name]
+                    st.experimental_rerun()
+            with col_remove:
+                if st.button("❌", key=f"rm_{name}"):
                     del st.session_state.cart[name]
-                    st.rerun()
+                    st.experimental_rerun()
 
             subtotal += data["price"] * data["qty"]
 
@@ -135,14 +148,8 @@ def pos_screen():
         st.write(f"Tax: +${tax_amount:.2f}")
         st.write(f"**Total: ${total:.2f}**")
 
-        # -----------------------------
         # Payment Methods
-        # -----------------------------
-        payment_method = st.radio(
-            "Payment Method",
-            ["Cash", "Card", "Mobile Wallet"]
-        )
-
+        payment_method = st.radio("Payment Method", ["Cash", "Card", "Mobile Wallet"])
         cash_received = 0
         change_due = 0
         if payment_method == "Cash":
@@ -153,15 +160,11 @@ def pos_screen():
 
         st.divider()
 
-        # -----------------------------
-        # Complete Sale Button
-        # -----------------------------
+        # Complete Sale
         if st.button("Complete Sale", use_container_width=True):
-
             if total <= 0 or len(st.session_state.cart) == 0:
                 st.warning("Cart is empty.")
                 return
-
             if payment_method == "Cash" and cash_received < total:
                 st.warning("Insufficient cash received.")
                 return
@@ -169,9 +172,8 @@ def pos_screen():
             # Reduce inventory & check auto-reorder
             for name, data in st.session_state.cart.items():
                 reduce_inventory(name, data["qty"])
-                check_auto_reorder(name, data["qty"])  # triggers reorder if needed
+                check_auto_reorder(name, data["qty"])
 
-            # Post to accounting engine
             post_sale(
                 subtotal=subtotal,
                 discount=discount_amount,
@@ -180,25 +182,17 @@ def pos_screen():
                 payment_method=payment_method
             )
 
-            # Update shift cash
-            if payment_method == "Cash":
-                st.session_state.shift["cash_sales"] += total
-
             st.session_state.cart = {}
             st.success("Sale Completed")
-            st.rerun()
+            st.experimental_rerun()
 
         st.divider()
-
-        # -----------------------------
-        # Close Shift Button
-        # -----------------------------
         if st.button("Close Shift", use_container_width=True):
             st.session_state.view_mode = "close_shift"
-            st.rerun()
+            st.experimental_rerun()
 
     # -----------------------------
-    # Barcode Scanner Support
+    # Barcode Scanner
     # -----------------------------
     barcode_input = st.text_input("Scan Barcode")
     if barcode_input:
