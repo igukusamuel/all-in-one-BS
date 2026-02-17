@@ -1,22 +1,28 @@
 import streamlit as st
 
-def post_sale(total):
-    if "gl" not in st.session_state:
-        st.session_state.gl = []
+def post_sale(subtotal, discount, tax, total):
+    """
+    Posts a retail sale into the accounting engine.
+    Assumes cash sale for now.
+    """
 
-    cost_total = total / 2  # assuming 50% cost
+    journal_entry = {
+        "debits": [
+            {"account": "Cash", "amount": total},
+            {"account": "Discount Expense", "amount": discount} if discount > 0 else None,
+        ],
+        "credits": [
+            {"account": "Revenue", "amount": subtotal},
+            {"account": "Tax Payable", "amount": tax} if tax > 0 else None,
+        ],
+    }
 
-    # Revenue entry
-    st.session_state.gl.append({
-        "debit": "Cash",
-        "credit": "Revenue",
-        "amount": total
-    })
+    # Remove None entries
+    journal_entry["debits"] = [d for d in journal_entry["debits"] if d]
+    journal_entry["credits"] = [c for c in journal_entry["credits"] if c]
 
-    # COGS entry
-    st.session_state.gl.append({
-        "debit": "COGS",
-        "credit": "Inventory",
-        "amount": cost_total
-    })
+    # For now just print — later store in DB
+    print("Journal Entry Posted:")
+    print(journal_entry)
 
+    return journal_entry
