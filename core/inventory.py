@@ -1,38 +1,26 @@
-import streamlit as st
 import json
+from core.config import LOW_STOCK_THRESHOLD
 
-def load_products():
-    try:
-        with open("data/products.json") as f:
-            return json.load(f)
-    except:
-        return []
-
-def save_products(products):
-    with open("data/products.json", "w") as f:
-        json.dump(products, f, indent=2)
+DATA_PATH = "data/products.json"
 
 def get_inventory():
-    if "inventory" not in st.session_state:
-        st.session_state.inventory = load_products()
-    return st.session_state.inventory
+    with open(DATA_PATH, "r") as f:
+        return json.load(f)
 
-def reduce_inventory(name, qty):
-    inventory = get_inventory()
-    for item in inventory:
-        if item["name"] == name:
+def save_inventory(data):
+    with open(DATA_PATH, "w") as f:
+        json.dump(data, f, indent=4)
+
+def reduce_inventory(product_name, qty):
+    data = get_inventory()
+
+    for item in data:
+        if item["name"] == product_name:
+            if item["stock"] < qty:
+                raise ValueError("Insufficient stock")
             item["stock"] -= qty
-    st.session_state.inventory = inventory
-    save_products(inventory)
 
-def check_auto_reorder(name, qty_sold):
-    # Simple auto-reorder: if stock <= min_stock, create PO
-    inventory = get_inventory()
-    for item in inventory:
-        if item["name"] == name and item["stock"] <= item.get("min_stock", 10):
-            if "pending_po" not in st.session_state:
-                st.session_state.pending_po = []
-            st.session_state.pending_po.append({
-                "product": name,
-                "qty": item.get("reorder_qty", 50)
-            })
+    save_inventory(data)
+
+def get_low_stock_items():
+    return [p for p in get_inventory() if p["stock"] <= LOW_STOCK_THRESHOLD]
