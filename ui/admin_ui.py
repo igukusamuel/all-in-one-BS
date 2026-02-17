@@ -6,15 +6,17 @@ def admin_screen():
 
     st.title("Admin Dashboard")
 
-    low_stock = check_auto_reorder()
+    if st.button("Logout"):
+        st.session_state.clear()
+        st.rerun()
 
-    st.subheader("Low Stock Items")
+    st.subheader("Low Stock")
 
+    low = check_auto_reorder()
     cols = st.columns(4)
 
-    for i, product in enumerate(low_stock):
+    for i, p in enumerate(low):
         with cols[i % 4]:
-            st.markdown(f"### {product['name']}")
-            st.write(f"Stock: {product['stock']}")
-            st.button(f"Order {product['name']}")
-
+            st.write(p["name"])
+            st.write(f"Stock: {p['stock']}")
+            st.button(f"Order {p['name']}")
