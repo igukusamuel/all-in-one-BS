@@ -1,109 +1,77 @@
 import streamlit as st
-from core.inventory import get_inventory, reduce_inventory, check_auto_reorder
-from core.accounting import post_sale
-
-CRITICAL_THRESHOLD = 10
+from core.inventory import get_inventory
+from services.pos_service import process_sale
+from core.config import VAT_RATE, LOW_STOCK_THRESHOLD
 
 def pos_screen():
+
+    st.title("Point of Sale")
 
     if "cart" not in st.session_state:
         st.session_state.cart = {}
 
-    inventory = get_inventory()
+    products = get_inventory()
 
-    st.title("Point of Sale")
+    categories = list(set(p["category"] for p in products))
+    selected_category = st.sidebar.selectbox("Category", categories)
 
-    col_cat, col_products, col_cart = st.columns([1, 3, 1.5])
+    filtered = [p for p in products if p["category"] == selected_category]
 
-    # ---------------------
-    # CATEGORY
-    # ---------------------
-    with col_cat:
-        categories = sorted(set(i["category"] for i in inventory))
-        selected_category = st.radio("Category", categories)
+    cols = st.columns(4)
 
-    # ---------------------
-    # PRODUCT GRID (3x4)
-    # ---------------------
-    with col_products:
-        filtered = [i for i in inventory if i["category"] == selected_category]
-        cols_per_row = 3
-        rows = (len(filtered) + cols_per_row - 1) // cols_per_row
+    for i, product in enumerate(filtered):
+        with cols[i % 4]:
 
-        for r in range(rows):
-            cols = st.columns(cols_per_row)
-            for c in range(cols_per_row):
-                idx = r * cols_per_row + c
-                if idx < len(filtered):
-                    item = filtered[idx]
-                    with cols[c]:
-                        st.markdown(f"### {item['name']}")
-                        st.write(f"Price: ${item['price']}")
-                        st.write(f"Stock: {item['stock']}")
+            low_stock = product["stock"] <= LOW_STOCK_THRESHOLD
 
-                        if st.button("➕ Add", key=f"add_{item['name']}"):
-                            if item["name"] in st.session_state.cart:
-                                st.session_state.cart[item["name"]]["qty"] += 1
-                            else:
-                                st.session_state.cart[item["name"]] = {
-                                    "price": item["price"],
-                                    "qty": 1
-                                }
+            badge = " 🔴 LOW" if low_stock else ""
 
-    # ---------------------
-    # CART
-    # ---------------------
-    with col_cart:
-        st.subheader("Cart")
-        subtotal = 0
+            st.markdown(f"### {product['name']}{badge}")
+            st.write(f"Stock: {product['stock']}")
+            st.write(f"Price: {product['price']}")
 
-        for name, data in list(st.session_state.cart.items()):
-            col1, col2, col3 = st.columns([2,1,1])
+            if st.button(f"Add {product['name']}"):
+                current = st.session_state.cart.get(product["name"], 0)
 
-            with col1:
-                st.write(f"{name} (Qty: {data['qty']})")
+                if current + 1 > product["stock"]:
+                    st.warning("Insufficient stock")
+                else:
+                    st.session_state.cart[product["name"]] = current + 1
+                    st.rerun()
 
-            with col2:
-                if st.button("➕", key=f"inc_{name}"):
-                    st.session_state.cart[name]["qty"] += 1
+    st.divider()
 
-            with col3:
-                if st.button("➖", key=f"dec_{name}"):
-                    if st.session_state.cart[name]["qty"] > 1:
-                        st.session_state.cart[name]["qty"] -= 1
-                    else:
-                        del st.session_state.cart[name]
+    subtotal = 0
+    for name, qty in st.session_state.cart.items():
+        price = next(p["price"] for p in products if p["name"] == name)
+        subtotal += price * qty
 
-            subtotal += data["price"] * data["qty"]
+    tax = round(subtotal * VAT_RATE, 0)
+    total = round(subtotal + tax, 0)
 
-        tax_rate = st.session_state.get("vat_rate", 12)
-        tax = subtotal * (tax_rate / 100)
+    st.subheader("Cart")
+    st.write(st.session_state.cart)
+    st.write(f"Subtotal: {round(subtotal,0)}")
+    st.write(f"Tax: {tax}")
+    st.write(f"Total: {total}")
 
-        total = round(subtotal + tax)  # Rounded
+    payment_method = st.radio("Payment", ["Cash", "Card", "Mobile Wallet"])
 
-        st.divider()
-        st.write(f"Subtotal: ${subtotal:.2f}")
-        st.write(f"Tax ({tax_rate}%): ${tax:.2f}")
-        st.write(f"**Total (Rounded): ${total}**")
+    if payment_method == "Cash":
+        amount = st.number_input("Amount Received", min_value=0.0)
+        change = round(amount - total, 0)
+        if amount >= total:
+            st.success(f"Change: {change}")
+        else:
+            st.error("Insufficient cash")
 
-        payment_method = st.radio("Payment", ["Cash", "Card", "Mobile Wallet"])
+    if st.button("Complete Sale"):
 
-        if st.button("Complete Sale", use_container_width=True):
-            if not st.session_state.cart:
-                st.warning("Cart empty")
-                return
+        if payment_method == "Cash" and amount < total:
+            st.stop()
 
-            for name, data in st.session_state.cart.items():
-                reduce_inventory(name, data["qty"])
-                check_auto_reorder(name, data["qty"])
+        process_sale(st.session_state.cart, total, payment_method)
 
-            post_sale(
-                subtotal=subtotal,
-                discount=0,
-                tax=tax,
-                total=total,
-                payment_method=payment_method
-            )
-
-            st.session_state.cart = {}
-            st.success("Sale Completed")
+        st.session_state.cart = {}
+        st.success("Sale Completed")
+        st.rerun()
