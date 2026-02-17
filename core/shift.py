@@ -1,10 +1,15 @@
-import streamlit as st
-import datetime
-
-def open_shift(float_amount):
-    st.session_state.shift = {
-        "shift_id": datetime.datetime.now().strftime("%Y%m%d%H%M%S"),
-        "float": float_amount,
-        "cash_sales": 0,
-        "cash_counted": 0
+def open_shift(amount):
+    return {
+        "is_open": True,
+        "beginning_cash": amount,
+        "cash_sales": 0
     }
+
+def record_cash_sale(shift, amount):
+    shift["cash_sales"] += amount
+
+def close_shift(shift, actual_cash):
+    expected = shift["beginning_cash"] + shift["cash_sales"]
+    variance = actual_cash - expected
+    shift["is_open"] = False
+    return expected, variance
