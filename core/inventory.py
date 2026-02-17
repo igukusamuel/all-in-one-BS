@@ -1,14 +1,21 @@
-import streamlit as st
-
 def get_inventory():
-    if "inventory" not in st.session_state:
-        st.session_state.inventory = [
-            {"name": "Coffee", "price": 10, "cost": 5, "stock": 1000}
-        ]
-    return st.session_state.inventory
+    return [
+        # BEVERAGES
+        {"name": "Espresso", "category": "Beverages", "price": 3.0, "stock": 50},
+        {"name": "Latte", "category": "Beverages", "price": 4.5, "stock": 30},
+        {"name": "Cappuccino", "category": "Beverages", "price": 4.0, "stock": 20},
+        {"name": "Iced Coffee", "category": "Beverages", "price": 5.0, "stock": 10},
+        {"name": "Tea", "category": "Beverages", "price": 2.5, "stock": 100},
 
-def reduce_inventory(name, qty):
-    for item in st.session_state.inventory:
-        if item["name"] == name:
-            item["stock"] -= qty
+        # SNACKS
+        {"name": "Croissant", "category": "Snacks", "price": 3.5, "stock": 15},
+        {"name": "Muffin", "category": "Snacks", "price": 3.0, "stock": 40},
+        {"name": "Bagel", "category": "Snacks", "price": 2.5, "stock": 60},
+        {"name": "Sandwich", "category": "Snacks", "price": 6.0, "stock": 12},
+        {"name": "Cookie", "category": "Snacks", "price": 2.0, "stock": 200},
+    ]
 
+
+def reduce_inventory(name, quantity):
+    # Replace with DB logic later
+    pass
