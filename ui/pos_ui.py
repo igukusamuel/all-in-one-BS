@@ -1,66 +1,32 @@
 import streamlit as st
-from PIL import Image
 from core.inventory import get_inventory, reduce_inventory, check_auto_reorder
 from core.accounting import post_sale
-from ui.purchase_order_ui import purchase_order_screen
 
-CRITICAL_THRESHOLD = 15
-TAX_RATE_DEFAULT = 0.12  # 12% VAT default
+CRITICAL_THRESHOLD = 10
 
 def pos_screen():
 
-    # -----------------------------
-    # INIT SESSION STATE
-    # -----------------------------
     if "cart" not in st.session_state:
         st.session_state.cart = {}
-    if "view_mode" not in st.session_state:
-        st.session_state.view_mode = "pos"
-    if "auto_po_triggered" not in st.session_state:
-        st.session_state.auto_po_triggered = False
-    if "barcode_input" not in st.session_state:
-        st.session_state.barcode_input = ""
 
     inventory = get_inventory()
 
-    # -----------------------------
-    # Auto-Reorder Trigger
-    # -----------------------------
-    low_stock_items = [i for i in inventory if i["stock"] <= i.get("min_stock", 10)]
-    if low_stock_items and not st.session_state.auto_po_triggered:
-        st.session_state.view_mode = "purchase_order"
-        st.session_state.auto_po_triggered = True
-        return  # Render PO screen next
-
-    # -----------------------------
-    # Show PO screen if triggered
-    # -----------------------------
-    if st.session_state.view_mode == "purchase_order":
-        purchase_order_screen()
-        return
-
-    # -----------------------------
-    # POS UI
-    # -----------------------------
     st.title("Point of Sale")
 
     col_cat, col_products, col_cart = st.columns([1, 3, 1.5])
 
-    # -----------------------------
-    # CATEGORY SELECTION
-    # -----------------------------
+    # ---------------------
+    # CATEGORY
+    # ---------------------
     with col_cat:
-        st.subheader("Categories")
-        categories = sorted(set(item["category"] for item in inventory))
-        selected_category = st.radio("Select Category", categories, label_visibility="collapsed")
+        categories = sorted(set(i["category"] for i in inventory))
+        selected_category = st.radio("Category", categories)
 
-    # -----------------------------
-    # PRODUCT GRID (3x4) with images
-    # -----------------------------
+    # ---------------------
+    # PRODUCT GRID (3x4)
+    # ---------------------
     with col_products:
-        st.subheader(selected_category)
         filtered = [i for i in inventory if i["category"] == selected_category]
-
         cols_per_row = 3
         rows = (len(filtered) + cols_per_row - 1) // cols_per_row
 
@@ -70,135 +36,74 @@ def pos_screen():
                 idx = r * cols_per_row + c
                 if idx < len(filtered):
                     item = filtered[idx]
-                    available_stock = item["stock"] - st.session_state.cart.get(item["name"], {}).get("qty", 0)
-
                     with cols[c]:
-                        # Product Image
-                        if item.get("image"):
-                            try:
-                                img = Image.open(item["image"])
-                                st.image(img, width=100)
-                            except:
-                                st.write("No image")
-                        # Product Info
-                        stock_warning = f" ⚠ Low Stock ({available_stock})" if available_stock <= CRITICAL_THRESHOLD else ""
-                        st.markdown(
-                            f"<div style='border:1px solid #ddd; padding:5px; border-radius:5px;'>"
-                            f"<h4>{item['name']}{stock_warning}</h4>"
-                            f"<p>Price: ${item['price']}</p>"
-                            f"<p>Stock: {available_stock}</p>"
-                            f"</div>",
-                            unsafe_allow_html=True
-                        )
+                        st.markdown(f"### {item['name']}")
+                        st.write(f"Price: ${item['price']}")
+                        st.write(f"Stock: {item['stock']}")
 
-                        # Add to cart button
-                        if st.button(f"➕", key=f"add_{item['name']}"):
+                        if st.button("➕ Add", key=f"add_{item['name']}"):
                             if item["name"] in st.session_state.cart:
                                 st.session_state.cart[item["name"]]["qty"] += 1
                             else:
-                                st.session_state.cart[item["name"]] = {"price": item["price"], "qty": 1}
+                                st.session_state.cart[item["name"]] = {
+                                    "price": item["price"],
+                                    "qty": 1
+                                }
 
-    # -----------------------------
-    # CART PANEL with emoji buttons
-    # -----------------------------
+    # ---------------------
+    # CART
+    # ---------------------
     with col_cart:
         st.subheader("Cart")
         subtotal = 0
 
         for name, data in list(st.session_state.cart.items()):
-            st.write(name)
-            col_qty, col_inc, col_dec, col_remove = st.columns([2, 1, 1, 1])
-            with col_qty:
-                st.write(f"Qty: {data['qty']}")
-            with col_inc:
+            col1, col2, col3 = st.columns([2,1,1])
+
+            with col1:
+                st.write(f"{name} (Qty: {data['qty']})")
+
+            with col2:
                 if st.button("➕", key=f"inc_{name}"):
                     st.session_state.cart[name]["qty"] += 1
-            with col_dec:
+
+            with col3:
                 if st.button("➖", key=f"dec_{name}"):
-                    st.session_state.cart[name]["qty"] -= 1
-                    if st.session_state.cart[name]["qty"] <= 0:
+                    if st.session_state.cart[name]["qty"] > 1:
+                        st.session_state.cart[name]["qty"] -= 1
+                    else:
                         del st.session_state.cart[name]
-            with col_remove:
-                if st.button("🗑️", key=f"rm_{name}"):
-                    del st.session_state.cart[name]
 
             subtotal += data["price"] * data["qty"]
 
+        tax_rate = st.session_state.get("vat_rate", 12)
+        tax = subtotal * (tax_rate / 100)
+
+        total = round(subtotal + tax)  # Rounded
+
         st.divider()
         st.write(f"Subtotal: ${subtotal:.2f}")
+        st.write(f"Tax ({tax_rate}%): ${tax:.2f}")
+        st.write(f"**Total (Rounded): ${total}**")
 
-        # Discount
-        discount_percent = st.number_input("Discount (%)", 0.0, 100.0, 0.0)
-        discount_amount = subtotal * (discount_percent / 100)
-        taxable_amount = subtotal - discount_amount
+        payment_method = st.radio("Payment", ["Cash", "Card", "Mobile Wallet"])
 
-        # VAT option
-        vat_inclusive = st.checkbox("VAT Inclusive Price", value=False)
-        vat_rate = st.number_input("VAT (%)", 0.0, 100.0, TAX_RATE_DEFAULT * 100)
-
-        if vat_inclusive:
-            subtotal_ex_vat = taxable_amount / (1 + vat_rate / 100)
-            tax_amount = taxable_amount - subtotal_ex_vat
-            total = taxable_amount
-        else:
-            tax_amount = taxable_amount * (vat_rate / 100)
-            total = taxable_amount + tax_amount
-
-        st.write(f"Discount: -${discount_amount:.2f}")
-        st.write(f"Tax: +${tax_amount:.2f}")
-        st.write(f"**Total: ${total:.2f}**")
-
-        # Payment Methods
-        payment_method = st.radio("Payment Method", ["Cash", "Card", "Mobile Wallet"])
-        cash_received = 0
-        change_due = 0
-        if payment_method == "Cash":
-            cash_received = st.number_input("Cash Received", min_value=0.0, step=1.0)
-            change_due = cash_received - total
-            if cash_received > 0:
-                st.write(f"Change Due: ${change_due:.2f}")
-
-        st.divider()
-
-        # Complete Sale
         if st.button("Complete Sale", use_container_width=True):
-            if total <= 0 or len(st.session_state.cart) == 0:
-                st.warning("Cart is empty.")
-                return
-            if payment_method == "Cash" and cash_received < total:
-                st.warning("Insufficient cash received.")
+            if not st.session_state.cart:
+                st.warning("Cart empty")
                 return
 
-            # Reduce inventory & check auto-reorder
             for name, data in st.session_state.cart.items():
                 reduce_inventory(name, data["qty"])
                 check_auto_reorder(name, data["qty"])
 
             post_sale(
                 subtotal=subtotal,
-                discount=discount_amount,
-                tax=tax_amount,
+                discount=0,
+                tax=tax,
                 total=total,
                 payment_method=payment_method
             )
 
             st.session_state.cart = {}
             st.success("Sale Completed")
-
-        st.divider()
-        if st.button("Close Shift", use_container_width=True):
-            st.session_state.view_mode = "close_shift"
-
-    # -----------------------------
-    # Barcode Scanner
-    # -----------------------------
-    barcode_input = st.text_input("Scan Barcode", value=st.session_state.barcode_input)
-    if barcode_input:
-        product = next((i for i in inventory if i.get("barcode") == barcode_input), None)
-        if product:
-            if product["name"] in st.session_state.cart:
-                st.session_state.cart[product["name"]]["qty"] += 1
-            else:
-                st.session_state.cart[product["name"]] = {"price": product["price"], "qty": 1}
-        # Clear barcode input after adding
-        st.session_state.barcode_input = ""
