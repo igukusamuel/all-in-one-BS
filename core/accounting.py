@@ -69,3 +69,9 @@ def post_purchase_order(po_items):
     print("Purchase Order posted to ledger:", journal_entry)
     return journal_entry
 
+
+def get_ledger():
+    if "ledger" not in st.session_state:
+        st.session_state.ledger = []
+    return st.session_state.ledger
+
